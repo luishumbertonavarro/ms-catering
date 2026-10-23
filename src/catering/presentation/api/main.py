@@ -1,0 +1,106 @@
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from catering.domain.exceptions import (
+    AnticipacionInsuficienteError,
+    CalendarioInactivoError,
+    CalendarioNoEncontradoError,
+    DireccionHabitualDuplicadaError,
+    EntregaNoEncontradaError,
+    EntregaNoModificableError,
+    FechaFueraDeRangoError,
+    PacienteNoEncontradoError,
+)
+from catering.infrastructure.config import settings
+
+logging.basicConfig(level=settings.log_level)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("ms-catering iniciando (env=%s)", settings.app_env)
+    yield
+    logger.info("ms-catering detenido")
+
+
+app = FastAPI(
+    title="ms-catering — NUR-TRICENTER",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# ── Exception handlers ─────────────────────────────────────────────────────────
+
+@app.exception_handler(AnticipacionInsuficienteError)
+async def anticipacion_handler(request: Request, exc: AnticipacionInsuficienteError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "tipo": "ANTICIPACION_INSUFICIENTE"},
+    )
+
+
+@app.exception_handler(EntregaNoEncontradaError)
+async def entrega_no_encontrada_handler(request: Request, exc: EntregaNoEncontradaError):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(exc), "tipo": "ENTREGA_NO_ENCONTRADA"},
+    )
+
+
+@app.exception_handler(EntregaNoModificableError)
+async def entrega_no_modificable_handler(request: Request, exc: EntregaNoModificableError):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "tipo": "ENTREGA_NO_MODIFICABLE"},
+    )
+
+
+@app.exception_handler(CalendarioInactivoError)
+async def calendario_inactivo_handler(request: Request, exc: CalendarioInactivoError):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "tipo": "CALENDARIO_INACTIVO"},
+    )
+
+
+@app.exception_handler(DireccionHabitualDuplicadaError)
+async def direccion_duplicada_handler(request: Request, exc: DireccionHabitualDuplicadaError):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "tipo": "DIRECCION_HABITUAL_DUPLICADA"},
+    )
+
+
+@app.exception_handler(FechaFueraDeRangoError)
+async def fecha_fuera_rango_handler(request: Request, exc: FechaFueraDeRangoError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "tipo": "FECHA_FUERA_DE_RANGO"},
+    )
+
+
+@app.exception_handler(CalendarioNoEncontradoError)
+async def calendario_no_encontrado_handler(request: Request, exc: CalendarioNoEncontradoError):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(exc), "tipo": "CALENDARIO_NO_ENCONTRADO"},
+    )
+
+
+@app.exception_handler(PacienteNoEncontradoError)
+async def paciente_no_encontrado_handler(request: Request, exc: PacienteNoEncontradoError):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(exc), "tipo": "PACIENTE_NO_ENCONTRADO"},
+    )
+
+
+# ── Routers ────────────────────────────────────────────────────────────────────
+
+from catering.presentation.api.routers.calendarios import router as calendarios_router  # noqa: E402
+
+app.include_router(calendarios_router)

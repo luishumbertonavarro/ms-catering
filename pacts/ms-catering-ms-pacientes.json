@@ -1,0 +1,121 @@
+{
+  "consumer": {
+    "name": "ms-catering"
+  },
+  "interactions": [
+    {
+      "description": "una petición de los datos de un paciente existente",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "existe el paciente",
+          "params": {
+            "paciente_id": "33333333-3333-4333-8333-333333333333"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "path": "/pacientes/33333333-3333-4333-8333-333333333333"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "codigo": "PAC-0001",
+            "id": "33333333-3333-4333-8333-333333333333",
+            "nombre": "María Pérez",
+            "numero_identificacion": "1234567"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.codigo": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.nombre": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.numero_identificacion": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "una petición de los datos de un paciente que no existe",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no existe el paciente",
+          "params": {
+            "paciente_id": "88888888-8888-4888-8888-888888888888"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "path": "/pacientes/88888888-8888-4888-8888-888888888888"
+      },
+      "response": {
+        "status": 404
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactRust": {
+      "ffi": "0.5.12",
+      "models": "1.3.16"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "ms-pacientes"
+  }
+}

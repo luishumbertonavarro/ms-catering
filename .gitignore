@@ -1,0 +1,23 @@
+# Secretos
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Tests
+.pytest_cache/
+.coverage
+.coverage.*
+.claude/settings.local.json
+
+# Reportes de cobertura
+# `htmlcov/` (suite completa) es regenerable y NO se versiona.
+# `htmlcov-unit/` y `coverage-unit.xml` SÍ se versionan: son la evidencia del
+# >= 80 % de la capa unitaria que se entrega con la presentación.
+htmlcov/
+coverage.xml

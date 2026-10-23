@@ -1,0 +1,24 @@
+# Entornos y artefactos locales que NO deben entrar a la imagen
+.venv/
+**/__pycache__/
+*.egg-info/
+src/*.egg-info/
+.pytest_cache/
+.git/
+.gitignore
+
+# Archivos de la propia orquestacion / docs que no afectan el runtime
+*.md
+.env
+docker-compose.yml
+bd-ms-catering.sql
+
+# Suite de pruebas y sus artefactos: no forman parte del runtime
+tests/
+pacts/
+postman/
+htmlcov/
+htmlcov-unit/
+coverage-unit.xml
+.coverage
+.claude/

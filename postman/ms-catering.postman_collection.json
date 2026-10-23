@@ -1,0 +1,1241 @@
+{
+  "info": {
+    "name": "ms-catering — Pruebas de integración",
+    "description": "Pruebas de integración de la API de calendarios de entrega (BC5 — NUR-TRICENTER).\n\nDos carpetas:\n\n- **01 — Flujo correcto**: crear → consultar → cambiar dirección (HU-26) → dirección habitual (HU-30) → día sin entrega (HU-27) → consulta por paciente (HU-25) → consolidado (HU-29) → cancelar. Las peticiones son dependientes: la primera guarda `calendario_id`, así que hay que ejecutar la carpeta **en orden**.\n- **02 — Flujo incorrecto**: cada regla violada devuelve el status y el código `tipo` que definen los manejadores de `presentation/api/main.py`.\n\nLos calendarios están en 2099 (siempre modificables) o en 2020 (nunca): la API usa la fecha de hoy como fecha de solicitud.\n\nAntes de ejecutar:\n\n    docker compose up -d catering_db\n    uv run alembic upgrade head\n    uv run fastapi dev main.py\n\nDesde la terminal:\n\n    npx newman run postman/ms-catering.postman_collection.json -e postman/ms-catering.postman_environment.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "paciente_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "calendario_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "calendario_error_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "calendario_pasado_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Flujo correcto",
+      "description": "Ciclo de vida completo de un calendario. Ejecutar en orden.",
+      "item": [
+        {
+          "name": "1. Crear calendario (201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Un paciente nuevo en cada corrida: la colección es repetible.",
+                  "pm.collectionVariables.set('paciente_id', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const cal = pm.response.json();",
+                  "pm.collectionVariables.set('calendario_id', cal.id);",
+                  "",
+                  "pm.test('El calendario nace ACTIVO con una entrega por día', function () {",
+                  "    pm.expect(cal.estado).to.eql('ACTIVO');",
+                  "    pm.expect(cal.total_dias).to.eql(15);",
+                  "    pm.expect(cal.entregas).to.have.lengthOf(15);",
+                  "});",
+                  "",
+                  "pm.test('Todas las entregas nacen PROGRAMADAS en la dirección inicial', function () {",
+                  "    cal.entregas.forEach(e => {",
+                  "        pm.expect(e.estado).to.eql('PROGRAMADA');",
+                  "        pm.expect(e.direccion).to.eql('Av. Banzer 123');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paciente_id\": \"{{paciente_id}}\",\n  \"fecha_inicio\": \"2099-01-01\",\n  \"fecha_fin\": \"2099-01-15\",\n  \"direccion_inicial\": {\n    \"direccion\": \"Av. Banzer 123\",\n    \"referencia\": \"Portón verde\",\n    \"zona\": \"Equipetrol\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Obtener calendario (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Devuelve el calendario recién creado', function () {",
+                  "    const cal = pm.response.json();",
+                  "    pm.expect(cal.id).to.eql(pm.collectionVariables.get('calendario_id'));",
+                  "    pm.expect(cal.paciente_id).to.eql(pm.collectionVariables.get('paciente_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Cambiar dirección de un día — HU-26 (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/entregas/2099-01-03/direccion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "entregas",
+                "2099-01-03",
+                "direccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nueva_direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Listar entregas: solo cambió ese día (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const entregas = pm.response.json();",
+                  "pm.test('El 2099-01-03 tiene la nueva dirección y el 04 la inicial', function () {",
+                  "    pm.expect(entregas.find(e => e.fecha === '2099-01-03').direccion).to.eql('Calle Libertad 456, piso 3');",
+                  "    pm.expect(entregas.find(e => e.fecha === '2099-01-04').direccion).to.eql('Av. Banzer 123');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/entregas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "entregas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Registrar dirección habitual — HU-30 (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/direcciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "direcciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"trabajo\",\n  \"direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  },\n  \"es_principal\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. Listar direcciones habituales (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Hay una dirección habitual llamada trabajo', function () {",
+                  "    const dirs = pm.response.json();",
+                  "    pm.expect(dirs).to.have.lengthOf(1);",
+                  "    pm.expect(dirs[0].nombre).to.eql('trabajo');",
+                  "    pm.expect(dirs[0].es_principal).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/direcciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "direcciones"
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Asignar dirección habitual a un día — HU-30 (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/entregas/2099-01-06/direccion-habitual",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "entregas",
+                "2099-01-06",
+                "direccion-habitual"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_direccion\": \"trabajo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8. Marcar un día sin entrega — HU-27 (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}/entregas/2099-01-10/sin-entrega",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}",
+                "entregas",
+                "2099-01-10",
+                "sin-entrega"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Viaje de trabajo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "9. Consultar calendario del paciente — HU-25 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const entrega = (cal, fecha) => cal.entregas.find(e => e.fecha === fecha);",
+                  "const cal = pm.response.json();",
+                  "pm.test('Es el calendario del paciente y refleja los cambios', function () {",
+                  "    pm.expect(cal.id).to.eql(pm.collectionVariables.get('calendario_id'));",
+                  "    pm.expect(entrega(cal, '2099-01-06').direccion).to.eql('Calle Libertad 456, piso 3');",
+                  "    pm.expect(entrega(cal, '2099-01-10').estado).to.eql('SIN_ENTREGA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/paciente/{{paciente_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "paciente",
+                "{{paciente_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "10. Consolidado del día — HU-29 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('El calendario aparece en el consolidado del día', function () {",
+                  "    const ids = pm.response.json().map(c => c.id);",
+                  "    pm.expect(ids).to.include(pm.collectionVariables.get('calendario_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/entregas/fecha/2099-01-05",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "entregas",
+                "fecha",
+                "2099-01-05"
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. Verificar modificación — HU-28 (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Con 1 día de anticipación no se puede modificar', function () {",
+                  "    pm.expect(pm.response.json()).to.eql({ puede_modificar: false, dias_faltantes: 1 });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/verificar-modificacion?fecha_entrega=2026-01-10&fecha_solicitud=2026-01-09",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "verificar-modificacion"
+              ],
+              "query": [
+                {
+                  "key": "fecha_entrega",
+                  "value": "2026-01-10"
+                },
+                {
+                  "key": "fecha_solicitud",
+                  "value": "2026-01-09"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "12. Cancelar calendario (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Releer: cancelado en cascada (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const entrega = (cal, fecha) => cal.entregas.find(e => e.fecha === fecha);",
+                  "const cal = pm.response.json();",
+                  "pm.test('El calendario queda CANCELADO', function () {",
+                  "    pm.expect(cal.estado).to.eql('CANCELADO');",
+                  "});",
+                  "",
+                  "pm.test('La cascada cancela las PROGRAMADAS y respeta el día sin entrega', function () {",
+                  "    pm.expect(entrega(cal, '2099-01-10').estado).to.eql('SIN_ENTREGA');",
+                  "    pm.expect(entrega(cal, '2099-01-01').estado).to.eql('CANCELADA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Flujo incorrecto",
+      "description": "Cada regla de negocio violada y su status + tipo.",
+      "item": [
+        {
+          "name": "1. Obtener calendario inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Cambiar dirección en calendario inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es CALENDARIO_NO_ENCONTRADO', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('CALENDARIO_NO_ENCONTRADO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/00000000-0000-4000-8000-000000000000/entregas/2099-01-05/direccion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "00000000-0000-4000-8000-000000000000",
+                "entregas",
+                "2099-01-05",
+                "direccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nueva_direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Preparación: crear calendario para los errores (201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Un paciente nuevo en cada corrida: la colección es repetible.",
+                  "pm.collectionVariables.set('paciente_id', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.collectionVariables.set('calendario_error_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paciente_id\": \"{{paciente_id}}\",\n  \"fecha_inicio\": \"2099-01-01\",\n  \"fecha_fin\": \"2099-01-15\",\n  \"direccion_inicial\": {\n    \"direccion\": \"Av. Banzer 123\",\n    \"referencia\": \"Portón verde\",\n    \"zona\": \"Equipetrol\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Fecha fuera del calendario (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422 Unprocessable Entity', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es FECHA_FUERA_DE_RANGO', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('FECHA_FUERA_DE_RANGO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/entregas/2099-02-01/direccion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "entregas",
+                "2099-02-01",
+                "direccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nueva_direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. Preparación: registrar dirección habitual (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/direcciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "direcciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"casa\",\n  \"direccion\": {\n    \"direccion\": \"Av. Banzer 123\",\n    \"referencia\": \"Portón verde\",\n    \"zona\": \"Equipetrol\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. Dirección habitual duplicada (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409 Conflict', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es DIRECCION_HABITUAL_DUPLICADA', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('DIRECCION_HABITUAL_DUPLICADA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/direcciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "direcciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"casa\",\n  \"direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. Preparación: marcar día sin entrega (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/entregas/2099-01-05/sin-entrega",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "entregas",
+                "2099-01-05",
+                "sin-entrega"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8. Marcar dos veces el mismo día (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409 Conflict', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es ENTREGA_NO_MODIFICABLE', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('ENTREGA_NO_MODIFICABLE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/entregas/2099-01-05/sin-entrega",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "entregas",
+                "2099-01-05",
+                "sin-entrega"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Otra vez\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "9. Preparación: crear calendario en el pasado (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.collectionVariables.set('calendario_pasado_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paciente_id\": \"{{$guid}}\",\n  \"fecha_inicio\": \"2020-01-01\",\n  \"fecha_fin\": \"2020-01-15\",\n  \"direccion_inicial\": {\n    \"direccion\": \"Av. Banzer 123\",\n    \"referencia\": \"Portón verde\",\n    \"zona\": \"Equipetrol\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "10. Cambio sin 2 días de anticipación — HU-28 (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422 Unprocessable Entity', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es ANTICIPACION_INSUFICIENTE', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('ANTICIPACION_INSUFICIENTE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_pasado_id}}/entregas/2020-01-05/direccion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_pasado_id}}",
+                "entregas",
+                "2020-01-05",
+                "direccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nueva_direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "11. Crear calendario sin paciente_id (422 de Pydantic)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422 Unprocessable Entity', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Pydantic señala el campo paciente_id', function () {",
+                  "    const campos = pm.response.json().detail.map(e => e.loc[e.loc.length - 1]);",
+                  "    pm.expect(campos).to.include('paciente_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha_inicio\": \"2099-01-01\",\n  \"fecha_fin\": \"2099-01-15\",\n  \"direccion_inicial\": {\n    \"direccion\": \"Av. Banzer 123\",\n    \"referencia\": \"Portón verde\",\n    \"zona\": \"Equipetrol\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "12. Preparación: cancelar el calendario (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Modificar un calendario cancelado (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409 Conflict', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es CALENDARIO_INACTIVO', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('CALENDARIO_INACTIVO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}/entregas/2099-01-06/direccion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}",
+                "entregas",
+                "2099-01-06",
+                "direccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nueva_direccion\": {\n    \"direccion\": \"Calle Libertad 456, piso 3\",\n    \"referencia\": \"Oficina 3B\",\n    \"zona\": \"Centro\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "14. Cancelar dos veces (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409 Conflict', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('El código tipo es CALENDARIO_INACTIVO', function () {",
+                  "    pm.expect(pm.response.json().tipo).to.eql('CALENDARIO_INACTIVO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/calendarios/{{calendario_error_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "calendarios",
+                "{{calendario_error_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

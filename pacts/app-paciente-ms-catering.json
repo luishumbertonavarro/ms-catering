@@ -1,0 +1,600 @@
+{
+  "consumer": {
+    "name": "app-paciente"
+  },
+  "interactions": [
+    {
+      "description": "una petición para obtener el calendario de un paciente",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "existe un calendario activo",
+          "params": {
+            "calendario_id": "44444444-4444-4444-8444-444444444444",
+            "paciente_id": "55555555-5555-4555-8555-555555555555"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "path": "/calendarios/paciente/55555555-5555-4555-8555-555555555555"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "direcciones_habituales": [
+              {
+                "direccion": "Calle Libertad 456",
+                "es_principal": true,
+                "id": null,
+                "nombre": "trabajo",
+                "referencia": "Oficina 3B",
+                "zona": "Centro"
+              }
+            ],
+            "entregas": [
+              {
+                "direccion": "Av. Banzer 123",
+                "estado": "PROGRAMADA",
+                "fecha": "2099-01-01",
+                "id": null,
+                "referencia": "Portón verde",
+                "tiene_etiqueta": false,
+                "zona": "Equipetrol"
+              }
+            ],
+            "estado": "ACTIVO",
+            "fecha_fin": "2099-01-15",
+            "fecha_inicio": "2099-01-01",
+            "id": "44444444-4444-4444-8444-444444444444",
+            "paciente_id": "55555555-5555-4555-8555-555555555555",
+            "plan_nutricional_id": "66666666-6666-4666-8666-666666666666",
+            "total_dias": 15
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "generators": {
+          "body": {
+            "$.direcciones_habituales[*].id": {
+              "type": "Uuid"
+            },
+            "$.entregas[*].id": {
+              "type": "Uuid"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.direcciones_habituales": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].direccion": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].es_principal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "boolean"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].nombre": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].referencia": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].zona": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.entregas[*].direccion": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas[*].estado": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^(PROGRAMADA|SIN_ENTREGA|CANCELADA|ENTREGADA)$"
+                }
+              ]
+            },
+            "$.entregas[*].fecha": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.entregas[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.entregas[*].referencia": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas[*].tiene_etiqueta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "boolean"
+                }
+              ]
+            },
+            "$.entregas[*].zona": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.estado": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^(ACTIVO|PAUSADO|COMPLETADO|CANCELADO)$"
+                }
+              ]
+            },
+            "$.fecha_fin": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.fecha_inicio": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.paciente_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.plan_nutricional_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.total_dias": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "una petición para obtener un calendario existente",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "existe un calendario activo",
+          "params": {
+            "calendario_id": "44444444-4444-4444-8444-444444444444",
+            "paciente_id": "55555555-5555-4555-8555-555555555555"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "path": "/calendarios/44444444-4444-4444-8444-444444444444"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "direcciones_habituales": [
+              {
+                "direccion": "Calle Libertad 456",
+                "es_principal": true,
+                "id": null,
+                "nombre": "trabajo",
+                "referencia": "Oficina 3B",
+                "zona": "Centro"
+              }
+            ],
+            "entregas": [
+              {
+                "direccion": "Av. Banzer 123",
+                "estado": "PROGRAMADA",
+                "fecha": "2099-01-01",
+                "id": null,
+                "referencia": "Portón verde",
+                "tiene_etiqueta": false,
+                "zona": "Equipetrol"
+              }
+            ],
+            "estado": "ACTIVO",
+            "fecha_fin": "2099-01-15",
+            "fecha_inicio": "2099-01-01",
+            "id": "44444444-4444-4444-8444-444444444444",
+            "paciente_id": "55555555-5555-4555-8555-555555555555",
+            "plan_nutricional_id": "66666666-6666-4666-8666-666666666666",
+            "total_dias": 15
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "generators": {
+          "body": {
+            "$.direcciones_habituales[*].id": {
+              "type": "Uuid"
+            },
+            "$.entregas[*].id": {
+              "type": "Uuid"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.direcciones_habituales": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].direccion": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].es_principal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "boolean"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].nombre": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].referencia": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.direcciones_habituales[*].zona": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.entregas[*].direccion": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas[*].estado": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^(PROGRAMADA|SIN_ENTREGA|CANCELADA|ENTREGADA)$"
+                }
+              ]
+            },
+            "$.entregas[*].fecha": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.entregas[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.entregas[*].referencia": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.entregas[*].tiene_etiqueta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "boolean"
+                }
+              ]
+            },
+            "$.entregas[*].zona": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.estado": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^(ACTIVO|PAUSADO|COMPLETADO|CANCELADO)$"
+                }
+              ]
+            },
+            "$.fecha_fin": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.fecha_inicio": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd",
+                  "match": "date"
+                }
+              ]
+            },
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.paciente_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.plan_nutricional_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^([0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12})$"
+                }
+              ]
+            },
+            "$.total_dias": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "una petición para obtener un calendario que no existe",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no existe el calendario",
+          "params": {
+            "calendario_id": "99999999-9999-4999-8999-999999999999"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "path": "/calendarios/99999999-9999-4999-8999-999999999999"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "detail": "Calendario no encontrado."
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactRust": {
+      "ffi": "0.5.12",
+      "models": "1.3.16"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "ms-catering"
+  }
+}

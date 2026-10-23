@@ -1,0 +1,87 @@
+name: ms-catering
+
+services:
+  catering_db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db_catering
+    ports:
+      # 5433 en el host — no colisiona con otros microservicios del grupo.
+      # Si Windows lo tiene reservado (Hyper-V/WinNAT), se puede mover sin tocar
+      # el archivo: CATERING_DB_PORT=55433 docker compose up -d catering_db
+      - "${CATERING_DB_PORT:-5433}:5432"
+    volumes:
+      - catering_postgres_data:/var/lib/postgresql/data
+      # El esquema lo gestiona Alembic (servicio catering_migrate).
+      # bd-ms-catering.sql se conserva solo como respaldo manual.
+    networks:
+      - nurtricenter_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d db_catering" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catering_cache:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6381:6379"   # 6380 ya lo usa ms-plan-nutricional
+    networks:
+      - nurtricenter_net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  catering_migrate:
+    image: betonavarro/ms-catering:0.1.1
+    restart: "no"
+    command: [ "uv", "run", "alembic", "upgrade", "head" ]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@catering_db:5432/db_catering
+    networks:
+      - nurtricenter_net
+    depends_on:
+      catering_db:
+        condition: service_healthy
+
+  catering_api:
+    image: betonavarro/ms-catering:0.1.1
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@catering_db:5432/db_catering
+      REDIS_URL: redis://catering_cache:6379/0
+      APP_ENV: development
+    ports:
+      # Rango, no puerto fijo: permite --scale catering_api=3 sin choques
+      - "8020-8022:8000"
+    networks:
+      - nurtricenter_net
+    depends_on:
+      catering_db:
+        condition: service_healthy
+      catering_cache:
+        condition: service_healthy
+      catering_migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/docs" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+
+  nurtricenter_net:
+    name: nurtricenter_net
+
+volumes:
+  catering_postgres_data:
+    name: catering_postgres_data
+    driver: local
