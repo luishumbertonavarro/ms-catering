@@ -11,6 +11,8 @@ dependencies = [
     "pydantic-settings>=2.2",
     # Cliente del adaptador real hacia ms-pacientes (PacienteGatewayHttp).
     "httpx>=0.27",
+    "aio-pika>=10.2.1",
+    "pyjwt>=2.15.1",
 ]
 
 [dependency-groups]

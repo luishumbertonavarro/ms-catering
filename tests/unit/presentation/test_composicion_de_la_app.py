@@ -41,6 +41,7 @@ ENDPOINTS = {
     ("PATCH", "/calendarios/{calendario_id}/entregas/{fecha}/direccion-habitual"),
     ("POST", "/calendarios/{calendario_id}/direcciones"),
     ("GET", "/calendarios/{calendario_id}/direcciones"),
+    ("GET", "/health"),  # health check que consulta Consul
 }
 
 
@@ -63,7 +64,7 @@ def test_la_app_monta_el_router_de_calendarios():
     prefijos = {ruta.split("/")[1] for _, ruta in _endpoints_de_la_app()}
 
     # Assert
-    assert prefijos == {"calendarios"}
+    assert prefijos == {"calendarios", "health"}
     assert all(isinstance(r, APIRoute) for r in calendarios.router.routes)
 
 

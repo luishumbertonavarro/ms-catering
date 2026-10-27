@@ -49,8 +49,12 @@ from catering.presentation.api.schemas import (
     VerificarModificacionResponse,
     calendario_to_response,
 )
+from catering.presentation.api.security import proteger
 
 router = APIRouter(prefix="/calendarios", tags=["calendarios"])
+
+# Operaciones de operación/administración: no las hace el paciente.
+_solo_admin = [Depends(proteger(lectura=("admin",), escritura=("admin",)))]
 
 
 async def _get_repo(session: AsyncSession = Depends(get_db_session)) -> CalendarioEntregaRepository:
@@ -63,7 +67,7 @@ def _get_validador_service() -> ValidadorCambioCalendarioService:
 
 # ── Calendarios ────────────────────────────────────────────────────────────────
 
-@router.post("", response_model=CalendarioResponse, status_code=201)
+@router.post("", response_model=CalendarioResponse, status_code=201, dependencies=_solo_admin)
 async def crear_calendario(
     body: CrearCalendarioRequest,
     repo: CalendarioEntregaRepository = Depends(_get_repo),
@@ -84,7 +88,7 @@ async def crear_calendario(
     return calendario_to_response(calendario)
 
 
-@router.get("", response_model=list[CalendarioResponse])
+@router.get("", response_model=list[CalendarioResponse], dependencies=_solo_admin)
 async def listar_calendarios_activos(
     repo: CalendarioEntregaRepository = Depends(_get_repo),
 ):
@@ -93,7 +97,9 @@ async def listar_calendarios_activos(
     return [calendario_to_response(c) for c in calendarios]
 
 
-@router.get("/entregas/fecha/{fecha}", response_model=list[CalendarioResponse])
+@router.get(
+    "/entregas/fecha/{fecha}", response_model=list[CalendarioResponse], dependencies=_solo_admin
+)
 async def obtener_entregas_de_fecha(
     fecha: date,
     repo: CalendarioEntregaRepository = Depends(_get_repo),
@@ -143,7 +149,7 @@ async def obtener_calendario(
     return calendario_to_response(calendario)
 
 
-@router.delete("/{calendario_id}", status_code=204)
+@router.delete("/{calendario_id}", status_code=204, dependencies=_solo_admin)
 async def cancelar_calendario(
     calendario_id: UUID,
     repo: CalendarioEntregaRepository = Depends(_get_repo),

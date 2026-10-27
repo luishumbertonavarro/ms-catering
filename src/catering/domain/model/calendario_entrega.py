@@ -13,6 +13,14 @@ from catering.domain.exceptions.catering_exceptions import (
 from catering.domain.model.direccion_habitual import DireccionHabitual
 from catering.domain.model.entrega import Entrega
 from catering.domain.model.enums import EstadoCalendario, EstadoEntrega
+from catering.domain.model.eventos import (
+    CalendarioEntregaCancelado,
+    CalendarioEntregaCompletado,
+    CalendarioEntregaCreado,
+    DiaSinEntregaMarcado,
+    DireccionEntregaCambiada,
+    EventoDominio,
+)
 from catering.domain.model.value_objects import AnticipacionMinima, DireccionEntrega, DiaSinEntrega
 
 
@@ -38,6 +46,7 @@ class CalendarioEntrega:
         self._direcciones_habituales: list[DireccionHabitual] = direcciones_habituales
         self._dias_sin_entrega: list[DiaSinEntrega] = dias_sin_entrega
         self._plan_nutricional_id = plan_nutricional_id
+        self._eventos: list[EventoDominio] = []
 
     # ------------------------------------------------------------------
     # Factory
@@ -76,6 +85,9 @@ class CalendarioEntrega:
             direcciones_habituales=[],
             dias_sin_entrega=[],
             plan_nutricional_id=plan_nutricional_id,
+        )
+        instance._eventos.append(
+            CalendarioEntregaCreado(calendario_id=calendario_id, direccion_entrega=direccion_default)
         )
         return instance
 
@@ -123,6 +135,15 @@ class CalendarioEntrega:
     def total_dias(self) -> int:
         return len(self._entregas)
 
+    @property
+    def eventos(self) -> list[EventoDominio]:
+        return list(self._eventos)
+
+    def extraer_eventos(self) -> list[EventoDominio]:
+        """Devuelve los eventos pendientes y los vacía: el repositorio los pasa al outbox al guardar."""
+        eventos, self._eventos = self._eventos, []
+        return eventos
+
     # ------------------------------------------------------------------
     # Commands
     # ------------------------------------------------------------------
@@ -139,7 +160,7 @@ class CalendarioEntrega:
         entrega = self._obtener_entrega(fecha)
         if not entrega.es_modificable:
             raise EntregaNoModificableError(fecha, entrega.estado.value)
-        entrega.cambiar_direccion(nueva_direccion)
+        self._registrar_cambio_direccion(entrega, nueva_direccion, "MANUAL", None)
 
     def marcar_dia_sin_entrega(
         self,
@@ -156,6 +177,11 @@ class CalendarioEntrega:
         entrega.marcar_sin_entrega()
         dia = DiaSinEntrega(fecha=fecha, motivo=motivo)
         self._dias_sin_entrega.append(dia)
+        self._eventos.append(
+            DiaSinEntregaMarcado(
+                calendario_id=self._id, entrega_id=entrega.id, fecha_entrega=fecha, motivo=motivo
+            )
+        )
 
     def asignar_direccion_habitual_a_dia(
         self,
@@ -170,7 +196,9 @@ class CalendarioEntrega:
         if not entrega.es_modificable:
             raise EntregaNoModificableError(fecha, entrega.estado.value)
         dir_habitual = self._obtener_direccion_habitual(nombre_direccion)
-        entrega.cambiar_direccion(dir_habitual.direccion)
+        self._registrar_cambio_direccion(
+            entrega, dir_habitual.direccion, "DIRECCION_HABITUAL", nombre_direccion
+        )
 
     def registrar_direccion_habitual(
         self,
@@ -189,20 +217,68 @@ class CalendarioEntrega:
         )
         self._direcciones_habituales.append(nueva)
 
+    def vincular_plan_nutricional(self, plan_nutricional_id: UUID) -> None:
+        """Asocia el plan (evento PlanNutricionalCreado) al calendario y a sus entregas pendientes."""
+        self._verificar_activo()
+        self._plan_nutricional_id = plan_nutricional_id
+        for entrega in self._entregas:
+            if entrega.estado == EstadoEntrega.PROGRAMADA:
+                entrega.plan_nutricional_id = plan_nutricional_id
+
     def completar_calendario(self) -> None:
         self._verificar_activo()
         self._estado = EstadoCalendario.COMPLETADO
+        self._eventos.append(
+            CalendarioEntregaCompletado(
+                calendario_id=self._id,
+                fecha_fin=self._fecha_fin,
+                entregas_realizadas=sum(
+                    1 for e in self._entregas if e.estado == EstadoEntrega.ENTREGADA
+                ),
+                dias_sin_entrega=sum(
+                    1 for e in self._entregas if e.estado == EstadoEntrega.SIN_ENTREGA
+                ),
+            )
+        )
 
     def cancelar_calendario(self) -> None:
         self._verificar_activo()
         self._estado = EstadoCalendario.CANCELADO
+        canceladas: list[date] = []
         for entrega in self._entregas:
             if entrega.estado == EstadoEntrega.PROGRAMADA:
                 entrega.cancelar()
+                canceladas.append(entrega.fecha)
+        self._eventos.append(
+            CalendarioEntregaCancelado(
+                calendario_id=self._id, fechas_canceladas=tuple(sorted(canceladas))
+            )
+        )
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _registrar_cambio_direccion(
+        self,
+        entrega: Entrega,
+        nueva_direccion: DireccionEntrega,
+        origen: str,
+        nombre_direccion_habitual: str | None,
+    ) -> None:
+        anterior = entrega.direccion
+        entrega.cambiar_direccion(nueva_direccion)
+        self._eventos.append(
+            DireccionEntregaCambiada(
+                calendario_id=self._id,
+                entrega_id=entrega.id,
+                fecha_entrega=entrega.fecha,
+                origen=origen,
+                nombre_direccion_habitual=nombre_direccion_habitual,
+                direccion_anterior=anterior,
+                direccion_nueva=nueva_direccion,
+            )
+        )
 
     def _verificar_activo(self) -> None:
         if self._estado != EstadoCalendario.ACTIVO:

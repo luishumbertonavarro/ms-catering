@@ -1,5 +1,12 @@
 name: ms-catering
 
+# Requisito: la infraestructura del grupo (Consul, RabbitMQ, api-gateway) levantada antes,
+# porque crea la red nurtricenter_net:
+#   cd ../api-gateway && docker compose up -d --build
+#
+# Levantar con 3 réplicas de la API (todas se registran en Consul y el gateway reparte entre ellas):
+#   docker compose up -d --build --scale catering_api=3
+
 services:
   catering_db:
     image: postgres:15
@@ -39,7 +46,8 @@ services:
       retries: 5
 
   catering_migrate:
-    image: betonavarro/ms-catering:0.1.1
+    build: .
+    image: betonavarro/ms-catering:0.2.0
     restart: "no"
     command: [ "uv", "run", "alembic", "upgrade", "head" ]
     environment:
@@ -51,12 +59,20 @@ services:
         condition: service_healthy
 
   catering_api:
-    image: betonavarro/ms-catering:0.1.1
+    build: .
+    image: betonavarro/ms-catering:0.2.0
     restart: always
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:password@catering_db:5432/db_catering
       REDIS_URL: redis://catering_cache:6379/0
-      APP_ENV: development
+      APP_ENV: docker
+      SERVICIO_NOMBRE: ms-catering
+      SERVICIO_PUERTO: 8000
+      CONSUL_URL: http://consul:8500
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      AUTH_HABILITADA: "true"
+      JWT_SECRET: ${JWT_SECRET:-nurtricenter-secreto-compartido-2026}
+      JWT_ISSUER: ${JWT_ISSUER:-nurtricenter-gateway}
     ports:
       # Rango, no puerto fijo: permite --scale catering_api=3 sin choques
       - "8020-8022:8000"
@@ -70,7 +86,7 @@ services:
       catering_migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/docs" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,6 +95,7 @@ services:
 networks:
 
   nurtricenter_net:
+    external: true
     name: nurtricenter_net
 
 volumes:

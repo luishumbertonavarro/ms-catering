@@ -16,8 +16,10 @@ from catering.domain.model import (
     EstadoEntrega,
 )
 from catering.domain.repositories import CalendarioEntregaRepository
+from catering.infrastructure.messaging.eventos_integracion import a_mensaje
 from catering.infrastructure.persistence.orm_models import (
     CalendarioEntregaORM,
+    OutboxORM,
     DiaSinEntregaORM,
     DireccionHabitualORM,
     EntregaORM,
@@ -121,6 +123,21 @@ class CalendarioEntregaRepositoryImpl(CalendarioEntregaRepository):
         self._session = session
 
     async def guardar(self, calendario: CalendarioEntrega) -> None:
+        await self._persistir(calendario)
+        # Transactional Outbox: los eventos se insertan en la MISMA sesión que el agregado,
+        # así se confirman (o se descartan) junto con él. El relay los publica después.
+        for evento in calendario.extraer_eventos():
+            mensaje = a_mensaje(evento, calendario)
+            self._session.add(
+                OutboxORM(
+                    tipo=mensaje.tipo,
+                    routing_key=mensaje.routing_key,
+                    payload=mensaje.payload,
+                    ocurrido_en=mensaje.ocurrido_en,
+                )
+            )
+
+    async def _persistir(self, calendario: CalendarioEntrega) -> None:
         # Se recarga la fila con sus colecciones. `session.get()` no basta: la
         # fila que leyó `obtener_por_id` ya se tradujo a dominio y el identity map
         # (de referencias débiles) puede haberla soltado; entonces `get()` vuelve
@@ -173,6 +190,7 @@ class CalendarioEntregaRepositoryImpl(CalendarioEntregaRepository):
                     existing.entregas.append(_entrega_to_orm(entrega))
                 else:
                     e_orm.estado = entrega.estado.value
+                    e_orm.plan_nutricional_id = entrega.plan_nutricional_id
                     e_orm.direccion = entrega.direccion.direccion
                     e_orm.referencia = entrega.direccion.referencia
                     e_orm.zona = entrega.direccion.zona

@@ -46,7 +46,8 @@ No hay linter ni formateador configurados.
 - **`concurrency = ["greenlet", "thread"]`** en `[tool.coverage.run]` es obligatorio: sin él, las líneas tras cada `await session.execute()` no se trazan.
 - **`fail_under = 80` aplica a cualquier invocación con `--cov`**; la medición oficial es `tests/unit` completo.
 - **Al regenerar `htmlcov-unit/`** borra el `htmlcov-unit/.gitignore` que coverage.py recrea con `*`.
-- **Imagen vigente: `betonavarro/ms-catering:0.1.1`** (incluye la corrección de `guardar()`, tests/README.md §8.1); la `0.1.0` no. Si cambias `src/`, reconstruye con un tag nuevo y actualiza `docker-compose.yml`. El `Dockerfile` excluye el grupo `test`.
+- **Imagen vigente: `betonavarro/ms-catering:0.2.0`** (outbox, RabbitMQ, Consul y JWT), construida por el compose (`build: .`). Si cambias `src/`, `docker compose up -d --build`. El `Dockerfile` excluye el grupo `test`.
+- **El compose necesita la red externa `nurtricenter_net`**, que crea `../api-gateway` (Consul + RabbitMQ + gateway). En el host, la auth, Consul y RabbitMQ quedan **desactivados** por defecto (`AUTH_HABILITADA`, `CONSUL_URL`, `RABBITMQ_URL`).
 - **FastAPI 0.13x** ya no expone las rutas de un router incluido en `app.routes`: usa `app.openapi()["paths"]` o `calendarios.router.routes`.
 
 ## Arquitectura
